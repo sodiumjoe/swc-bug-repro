@@ -35,7 +35,10 @@ pub fn parse(input: &str) -> Module {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use swc_core::ecma::{ast::*, visit::*};
+    use swc_core::{
+        common::{hygiene::*, *},
+        ecma::{ast::*, transforms::base::*, visit::*},
+    };
 
     #[test]
     fn it_works() {
@@ -76,8 +79,15 @@ import {foo} from 'bar';
             import: None,
             var: None,
         };
-        Program::Module(parsed).fold_with(&mut tester);
-        println!("{:#?}", tester);
-        assert!(tester.import.unwrap().span.ctxt != tester.var.unwrap().span.ctxt);
+
+        let globals = Globals::new();
+
+        GLOBALS.set(&globals, || {
+            Program::Module(parsed)
+                .fold_with(&mut resolver(Mark::new(), Mark::new(), true))
+                .fold_with(&mut tester);
+            println!("{:#?}", tester);
+            assert!(tester.import.unwrap().span.ctxt != tester.var.clone().unwrap().span.ctxt);
+        });
     }
 }
